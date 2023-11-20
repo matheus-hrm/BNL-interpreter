@@ -1,7 +1,7 @@
 # lang racket 
 
 
-(define gramm '(
+(define-syntax-parser my-lang (
     (FUNC_DEF (PROTOCOL FUNC_BODY) func_def)
     (FUNC_DEF (PROTOCOL VAR_DEF FUNC_BODY) func_def)
     (PROTOCOL ("function" NAME "<" ">") protocol)
@@ -28,7 +28,7 @@
     (ATTRIBUTION (FUNC_ATTRIBUTION) attribution)
     (SIMPLE_ATTRIBUTION (NAME "=" VAL) simple_attribution)
     (EXPR_ATTRIBUTION (NAME "=" VAL OP VAL) expr_attribution)
-    (FUNC_ATTRIBUTION (NAME "=" FUNC_CALL) func_attribution)
+    (FUNC_ATTRIBUTION (NAMES "=" FUNC_CALL) func_attribution)
 
     (CONDITIONAL ("IF" "<"IF_TEST">" "THEN" IF_COMMAND "FI") conditional)
     (IF_TEST (VAL REL_OP VAL) if_test)
@@ -50,22 +50,9 @@
 
     (OP ("+" "-" "*" "/") op)
     (NAME ( [a-z] ) name)
-    (INTEGER ( [0-9] ) integer)
-    (FLOAT ( [0-9] "." [0-9] ) float)
-
+    (INTEGER ( [0-9]* ) integer)
+    (FLOAT ( [0-9]"."[0-9]* ) float)
 ))
-
-(define (func_def code)
-    (eq? (cadr code) (protocol (cadr code)))
-    
-)
-
-(define (protocol code)
-    (cond
-        ((eq? (cadr code) 'function (caddr code) '<>))
-        ((eq? (cadr code) 'function (caddr code) '< (caddr code) '>))
-    ) 
-)
 
 
 (define code '(
