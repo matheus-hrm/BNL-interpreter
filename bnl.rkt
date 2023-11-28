@@ -1,76 +1,110 @@
-# lang racket 
+#lang racket
+
+(define process
+  (lambda (code)
+    (eval (parse-tree (reader code)))))
+
+(define (reader expr)
+  (let append ((expr expr) (acc '()))
+    (cond
+      ((null? expr) (reverse acc))
+      ((equal? (car expr) '!))
+      (else (append (cdr expr) (cons (car expr) acc)))
+    )
+  )
+)
+
+(define (parse-tree expr)
+  (cond 
+    ((equal? (car expr) 'function) (parse-function (cdr expr)))
+    (else '())
+  )
+)
+
+(define (parse-function expr)
+  (cons 'function (parse-body expr))
+)
+
+(define (parse-body expr)
+  (cond
+    ((equal? (car expr) 'begin) (parse-begin (cdr expr)))
+    (else '())
+  )
+)
+  
+(define (parse-begin expr)
+  (cond
+    ((equal? (car expr) 'return) (parse-return (cdr expr)))
+    (else '())
+  )
+)
+
+(define (parse-return expr)
+  (cons 'return (parse-expr (cdr expr)))
+)
+
+(define (parse-expr expr)
+  (cond
+    ((equal? (car expr) '!))
+    ((equal? (car expr) '=) (parse-assign (cdr expr)))
+    ((equal? (car expr) '+) (parse-add (cdr expr)))
+    (else '())
+  )
+)
+
+(define (parse-assign expr)
+  (cons '= (parse-expr (cdr expr)))
+)
+
+(define (parse-add expr)
+  (cons '+ (parse-expr (cdr expr)))
+)
 
 
-(define-syntax-parser my-lang (
-    (FUNC_DEF (PROTOCOL FUNC_BODY) func_def)
-    (FUNC_DEF (PROTOCOL VAR_DEF FUNC_BODY) func_def)
-    (PROTOCOL ("function" NAME "<" ">") protocol)
-    (PROTOCOL ("function" NAME "<" NAMES ">") protocol)
-    (VAR_DEF ("vars" NAMES) var_def)
-    
-    (NAMES (NAME) names)
-    (NAMES (NAME NAMES) names)
-    (FUNC_BODY ("begin" COMMANDS "end") func_body)
-    
-    (COMMANDS (COMMAND) commands)
-    (COMMANDS (COMMAND COMMANDS) commands)
-    (COMMAND (FUNC_CALL "!") command)
-    (COMMAND (RETURN "!") command)
-    (COMMAND (ATTRIBUTION "!") command)
-    (COMMAND (IF "!") command)
-    (COMMAND (CODE_MOD "!") command)
-    
-    (FUNC_CALL (NAME "<" ">") func_call)
-    (FUNC_CALL (NAME "<" VALS ">") func_call)
-    (RETURN (RETURN VALS) return)
-    (ATTRIBUTION (SIMPLE_ATTRIBUTION) attribution)
-    (ATTRIBUTION (EXPR_ATTRIBUTION) attribution)
-    (ATTRIBUTION (FUNC_ATTRIBUTION) attribution)
-    (SIMPLE_ATTRIBUTION (NAME "=" VAL) simple_attribution)
-    (EXPR_ATTRIBUTION (NAME "=" VAL OP VAL) expr_attribution)
-    (FUNC_ATTRIBUTION (NAMES "=" FUNC_CALL) func_attribution)
+(define (eval expr)
+  (cond 
+    ((equal? (car expr) 'function) (eval-function (cdr expr)))
+    (else '())
+  )
+)
 
-    (CONDITIONAL ("IF" "<"IF_TEST">" "THEN" IF_COMMAND "FI") conditional)
-    (IF_TEST (VAL REL_OP VAL) if_test)
-    (REL_OP ("lt" "le" "gt" "ge" "eq" "ne") rel_op)
-    (IF_COMMAND (FUNC_CALL "!") if_command)
-    (IF_COMMAND (ATTRIBUTION "!") if_command)
-    (IF_COMMAND (RETURN "!") if_command)
+(define (eval-function expr)
+  (eval-body expr)
+)
 
-    (CODE_MOD (CODE_UPDT CODE_DEL) code_mod)
-    (CODE_UPDT ("update" NAME "@" INTEGER : COMMAND) code_updt)
-    (CODE_DEL ("delete" NAME "@" INTEGER) code_del)
-    
-    (VALS (VAL) vals)
-    (VALS (VAL VALS) vals)
-    (VAL (NAME) val)
-    (VAL (NUMBER) val)
-    (NUMBER (INTEGER) number)
-    (NUMBER (FLOAT) number)
+(define (eval-body expr)
+  (cond
+    ((equal? (car expr) 'begin) (eval-begin (cdr expr)))
+    (else '())
+  )
+)
 
-    (OP ("+" "-" "*" "/") op)
-    (NAME ( [a-z] ) name)
-    (INTEGER ( [0-9]* ) integer)
-    (FLOAT ( [0-9]"."[0-9]* ) float)
-))
+(define (eval-begin expr)
+  (cond
+    ((equal? (car expr) 'return) (eval-return (cdr expr)))
+    (else '())
+  )
+)
 
+(define (eval-return expr)
+  (eval-expr expr)
+)
+
+(define (eval-expr expr)
+  (cond
+    ((equal? (car expr) '!))
+    ((equal? (car expr) '=) (eval-assign (cdr expr)))
+    ((equal? (car expr) '+) (eval-add (cdr expr)))
+    (else '())
+  )
+)
 
 (define code '(
-    function main < >
-    begin
-        a = 2 !
-        a = 5.0 + 4 !
-        return a !
-    end
+  function main
+  begin
+    a = 2 !
+    a = 5.0 + 4 !
+    return a !
 ))
-
-
-
-(define process (lambda (code)
-    (cond
-        ((eq? (car code) 'function) (func_def code)')
-    )
-))
-
 
 (process code)

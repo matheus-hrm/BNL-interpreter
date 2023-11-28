@@ -1,0 +1,27 @@
+- FUNC_DEF ::= PROTOCOL FUNC_BODY | PROTOCOL VAR_DEF FUNC_BODY
+- PROTOCOL ::= "function" NAME "<" ">" | "function" NAME "<" NAMES ">"
+- VAR_DEF ::= "vars" NAMES
+- NAMES ::= NAME | NAME NAMES
+- FUNC_BODY ::= "begin" COMMANDS "end"
+- COMMANDS ::= COMMAND | COMMAND COMMANDS
+- COMMAND ::= FUNC_CALL "!" | RETURN "!" | ATTRIBUTION "!" | IF "!" | CODE_MOD "!"
+- FUNC_CALL ::= NAME "<" ">" | NAME "<" VALS ">"
+- RETURN ::= RETURN VALS
+- ATTRIBUTION ::= SIMPLE_ATTRIBUTION | EXPR_ATTRIBUTION | FUNC_ATTRIBUTION
+- SIMPLE_ATTRIBUTION ::= NAME "=" VAL
+- EXPR_ATTRIBUTION ::= NAME "=" VAL OP VAL
+- FUNC_ATTRIBUTION ::= NAMES "=" FUNC_CALL
+- CONDITIONAL ::= "IF" "<"IF_TEST">" "THEN" IF_COMMAND "FI"
+- IF_TEST ::= VAL REL_OP VAL
+- REL_OP ::= "lt" | "le" | "gt" | "ge" | "eq" | "ne"
+- IF_COMMAND ::= FUNC_CALL "!" | ATTRIBUTION "!" | RETURN "!"
+- CODE_MOD ::= CODE_UPDT CODE_DEL
+- CODE_UPDT ::= "update" NAME "@" INTEGER : COMMAND
+- CODE_DEL ::= "delete" NAME "@" INTEGER
+- VALS ::= VAL | VAL VALS
+- VAL ::= NAME | NUMBER
+- NUMBER ::= INTEGER | FLOAT
+- OP ::= "+" | "-" | "*" | "/"
+- NAME ::= [a-z]
+- INTEGER ::= [0-9]*
+- FLOAT ::= [0-9]"."[0-9]*
