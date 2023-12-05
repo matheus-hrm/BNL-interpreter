@@ -4,33 +4,73 @@
   (cond
    ((null? tokens) (error "Empty program"))
    ((equal? (car tokens) 'function ) (parse-function (cdr tokens)))
-   (else (parser (cdr tokens)))
-  )
-)
+   (else (parser (cdr tokens)))))
 
 (define (parse-function tokens)
-  (let ((function-name (cadr tokens))
-        (function-args (caddr tokens))
-        (function-body (cdddr tokens)))
-    (list 'function function-name function-args function-body)))
+  (let ((function-name (car tokens))
+        (rest-tokens (cddr tokens)))
+    (let loop ((args '()))
+      (cond
+       ((null? rest-tokens) (list 'function function-name args '()))
+       ((equal? (car rest-tokens) '<)
+        (let* ((arg (cadr rest-tokens))
+               (remaining-tokens (cddr rest-tokens)))
+          (loop (append args (list arg)) remaining-tokens)))
+       (else (error "Invalid function declaration"))))))
 
-(define (eval ast env)
-  (cond 
-    ((equal? (car ast) 'function) (eval-function (cdr ast) env))
-    ((equal? (car ast) 'vars ) (eval-vars (cdr ast) env))
-    ((equal? (car ast) 'begin) (eval-begin (cdr ast) env))
-    ((equal? (car ast) 'if) (eval-if (cdr ast) env))
-    ((equal? (car ast) 'return) (eval-return (cadr ast) env))
-  ))
+(define (parse-body tokens)
+  (cond
+    ((null? tokens) '())
+    ((equal? (car tokens) 'vars) (cons (parse-vars (cdr tokens)) (parse-body (cddr tokens))))
+    ((equal? (car tokens) 'begin) (cons (parse-begin (cdr tokens)) (parse-body (cddr tokens))))
+    ((equal? (car tokens) 'if) (cons (parse-if (cdr tokens)) (parse-body (cddr tokens))))
+    ((equal? (car tokens) 'return) (cons (parse-return (cdr tokens)) (parse-body (cddr tokens))))
+    (else (error "Unknown expression"))))
 
-(define (eval-function ast env)
-  (let ((function-name (car ast))
-        (function-args (cadr ast))
-        (function-body (caddr ast)))
-    (define (function-eval args)
-      (let ((new-env (append (map (lambda (arg) (list arg (car args))) function-args) env)))
-        (eval function-body new-env)))
-    (list function-name function-eval)))
+
+(define (parse-vars tokens)
+  (let loop ((tokens tokens)
+             (vars '()))
+    (cond
+      ((null? tokens) vars)
+      ((equal? (car tokens) '!) vars)
+      ((equal? (car tokens) 'end) vars)
+      (else (loop (cdr tokens) (append vars (list (parse-var (car tokens)))))))))
+
+(define (parse-var tokens)
+  (let ((var-name (car tokens))
+        (var-value (cadr tokens)))
+    (list var-name (parse-expression var-value))))
+
+(define (parse-expression tokens)
+  (cond
+    ((number? tokens) tokens)
+    ((string? tokens) tokens)
+    ((equal? tokens 'gt) '>)
+    ((equal? tokens 'lt) '<)
+    ((equal? tokens 'eq) '=)
+    ((equal? tokens 'print) 'display)
+    ((equal? tokens '+) '())
+    ((equal? tokens '-) '())
+    ((equal? tokens '*) '())
+    ((equal? tokens '/) '())))
+
+(define (parse-begin tokens)
+  (let loop ((tokens tokens)
+             (expressions '()))
+    (cond
+      ((null? tokens) expressions)
+      ((equal? (car tokens) 'end) expressions)
+      (else (loop (cdr tokens) (append expressions (list (parse-expression (car tokens)))))))))
+
+(define (parse-if tokens)
+  (let ((condition (car tokens))
+        (then-expr (cadr tokens))
+        (else-expr (caddr tokens)))
+    (list 'if (parse-expression condition) (parse-expression then-expr) (parse-expression else-expr))))
+
+(define (parse-return tokens)
+  (list 'return (parse-expression (car tokens))))
 
 (define (eval-vars ast env)
  (let ((vars (car ast)))
@@ -68,22 +108,21 @@
     
     (define (process-char c)
       (cond
-       ((char-whitespace? c) ; Verifica se o caractere é um espaço em branco
+       ((char-whitespace? c)        ; Verifica se o caractere é um espaço em branco
         (add-token))
-       ((char=? c #\") ; Verifica se o caractere é uma aspa dupla
+       ((char=? c #\")              ; Verifica se o caractere é uma aspa dupla
         (if inside-string?
             (begin (set! inside-string? #f) (add-token))
             (set! inside-string? #t)))
-       ((char=? c #\;) ; Ignora o restante da linha se encontrar um ponto e vírgula (comentário)
-        (add-token) ; Adiciona o token antes de ignorar o restante da linha
-        (set! current-token '()) ; Reseta o token atual
-        (set! inside-string? #f) ;  não esta dentro de uma string
-        (read-line)) ; Ignora o restante da linha
-       ((eof-object? c) ; Verifica se  final do arquivo
-        (add-token)) ; Adiciona o último token se houver algum
+       ((char=? c #\;)              ; Ignora o restante da linha se encontrar um ponto e vírgula (comentário)
+        (add-token)                 ; Adiciona o token antes de ignorar o restante da linha
+        (set! current-token '())    ; Reseta o token atual
+        (set! inside-string? #f)    ; não esta dentro de uma string
+        (read-line))                ; Ignora o restante da linha
+       ((eof-object? c)             ; Verifica se  final do arquivo
+        (add-token))                ; Adiciona o último token se houver algum
        (else
         (set! current-token (append current-token (list c))))))
-
     (for-each process-char code)
     tokens))
 ;; Exemplo de uso:
@@ -98,4 +137,6 @@
      end
    )")
 
-(display (eval (parser (lexer (string->list code-example))) '()))
+(display (lexer (string->list code-example)))
+(newline)
+(display (parser (lexer (string->list code-example)))) ; fix
