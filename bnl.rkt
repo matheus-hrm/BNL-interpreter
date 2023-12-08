@@ -1,7 +1,9 @@
 #lang racket
 
 (define (parse-program tokens)
-  (parse-func-def tokens))
+  (if (equal? (peek-token tokens) 'function)
+      (parse-func-def tokens)
+      (parse-program (cadr tokens))))
 
 (define (parse-func-def tokens)
   (let ((protocol (parse-protocol tokens)))
@@ -39,48 +41,6 @@
        (loop (cons (consume-token tokens) names)))
       (else (reverse names)))))
 
-(define (parse-func-body tokens)
-  (expect-token tokens 'begin)
-  (let ((commands (parse-commands tokens)))
-    (expect-token tokens 'end)
-    `(func-body ,commands)))
-
-(define (parse-commands tokens)
-  (let loop ((commands '()))
-    (cond
-      ((equal? (peek-token tokens) 'end)
-       (reverse commands))
-      (else
-       (let ((command (parse-command tokens)))
-         (loop (cons command commands)))))))
-
-(define (parse-command tokens)
-  (let ((cmd (parse-func-call tokens)))
-    (expect-token tokens 'bang)
-    `(command ,cmd)))
-
-(define (parse-func-call tokens)
-  (let ((name (expect-token tokens 'identifier)))
-    (cond
-      ((equal? (peek-token tokens) '<)
-       (consume-token tokens)
-       (expect-token tokens '>)
-       `(func-call-no-args ,name))
-      ((equal? (peek-token tokens) '<)
-       (consume-token tokens)
-       (let ((vals (parse-vals tokens)))
-         (expect-token tokens '>)
-         `(func-call-with-args ,name ,vals))))))
-
-(define (parse-vals tokens)
-  (let loop ((vals '()))
-    (cond
-      ((equal? (peek-token tokens) 'identifier)
-       (loop (cons (consume-token tokens) vals)))
-      ((equal? (peek-token tokens) 'number)
-       (loop (cons (consume-token tokens) vals)))
-      (else (reverse vals)))))
-
 (define (expect-token tokens expected)
   (let ((actual (peek-token tokens)))
     (if (equal? expected actual)
@@ -96,6 +56,8 @@
   (let ((current-token (peek-token tokens)))
     (set! tokens (cdr tokens))
     current-token))
+
+;; Example usage:
 
 
 (define (lexer code)
@@ -139,4 +101,10 @@
      end
    )")
 
-(display (parse-program (lexer (string->list code-example)))) ; fix
+(define example-code
+  " function main < > vars a b b = 2 ! begin a = 2 ! if a gt b then b = 0 fi return 0 ! end")
+
+(define example-tokens 
+  (lexer (string->list code-example)))
+
+(display (parse-program example-tokens))
