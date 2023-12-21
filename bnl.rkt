@@ -1,110 +1,72 @@
 #lang racket
 
-(define (parse-program tokens)
-  (if (equal? (peek-token tokens) 'function)
-      (parse-func-def tokens)
-      (parse-program (cadr tokens))))
+(define escopos (list (make-hash)))          
 
-(define (parse-func-def tokens)
-  (let ((protocol (parse-protocol tokens)))
-    (cond
-      ((equal? (peek-token tokens) 'vars)
-       (consume-token tokens)
-       (let ((var-def (parse-var-def tokens)))
-         `(func-def-vars ,protocol ,var-def)))
-      (else
-       `(func-def ,protocol)))))
+(define (var-cria nome valor)
+  (hash-set! (car escopos) nome valor))
 
-(define (parse-protocol tokens)
-  (expect-token tokens 'function)
-  (let ((name (expect-token tokens 'identifier)))
-    (cond
-      ((equal? (peek-token tokens) '<)
-       (consume-token tokens)
-       (expect-token tokens '>)
-       `(protocol-no-args ,name))
-      ((equal? (peek-token tokens) '<)
-       (consume-token tokens)
-       (let ((names (parse-names tokens)))
-         (expect-token tokens '>)
-         `(protocol-with-args ,name ,names))))))
+(define (var-acessa nome)
+  (hash-ref (car escopos) nome))          
+(define (escopo-entra)          
+  (set! escopos (cons (make-hash) escopos)))
 
-(define (parse-var-def tokens)
-  (expect-token tokens 'vars)
-  (let ((names (parse-names tokens)))
-    `(var-def ,names)))
+(define (escopo-sai)          
+  (set! escopos (cdr escopos)))          
 
-(define (parse-names tokens)
-  (let loop ((names '()))
-    (cond
-      ((equal? (peek-token tokens) 'identifier)
-       (loop (cons (consume-token tokens) names)))
-      (else (reverse names)))))
+(define (processar-linha linha)          
+  (define (remover-espacos str)
+    (string-join (string-split str) "")) ; Remove espaços da string **NAO FUNCIONA**
+  (cond
+    ((string-contains? linha "var")
+     (let* ((parts (string-split linha)); Divide a linha em partes
+            (nome (cadr parts))
+            (valor-str (cadddr parts))
+            (val (if (string->number valor-str)
+                     (string->number valor-str)
+                     (if (string-contains? valor-str "+") ; Se o valor contém "+", é uma soma
+                         (let* ((sum-parts (string-split valor-str "+"))
+                                (a (string->number  (car sum-parts))) ; Obtém o primeiro valor da soma
+                                (b (string->number  (cadr sum-parts))))
+                           (+ a b))
+                         (error "Valor inválido")))))
+       (var-cria nome val)))                    
+    ((string-contains? linha "escopo"); Se a linha contém "escopo", entra em um novo escopo
+     (escopo-entra))                    
+    ((string-contains? linha "end"); Se a linha contém "end", sai do escopo atual
+     (escopo-sai))                    
+    (else #f)))     ; Se a linha não se encaixa em nenhum caso, retorna #f              
+(define (processar-codigo codigo)
+  (for-each processar-linha (string-split codigo "\n")))
 
-(define (expect-token tokens expected)
-  (let ((actual (peek-token tokens)))
-    (if (equal? expected actual)
-        (consume-token tokens)
-        (error (format "Expected ~a, but got ~a" expected actual)))))
+(define process (processar-codigo "
+                                   var a = 1
+                                   var b = 2
+                                   escopo
+                                   var a = 3
+                                   var c = 4
+                                   escopo
+                                   var a = 5
+                                   var d = 2+3  
+                                   "))
+(define (exibir-todas-variaveis)
+  (display "Todas as variáveis:")
+  (newline)
+  (for-each (lambda (escopo); Para cada escopo na lista de escopos
+              (let ((variaveis (hash->list escopo))); Obtém a lista de variáveis do escopo
+                (for-each (lambda (variavel); Para cada variável no escopo
+                            (display (format "~a = ~a" (car variavel) (cdr variavel))); Exibe o nome e o valor da variável
+                            (newline))
+                          variaveis)))
+            escopos))
+(exibir-todas-variaveis)
 
-(define (peek-token tokens)
-  (if (null? tokens)
-      'eof
-      (car tokens)))
 
-(define (consume-token tokens)
-  (let ((current-token (peek-token tokens)))
-    (set! tokens (cdr tokens))
-    current-token))
-
-;; Example usage:
-
-
-(define (lexer code)
-  (let ((tokens '())
-        (current-token '())
-        (inside-string? #f))
-    
-    (define (add-token)
-      (when (not (null? current-token))
-        (set! tokens (append tokens (list (string->symbol (list->string current-token)))))
-        (set! current-token '())))
-    
-    (define (process-char c)
-      (cond
-       ((char-whitespace? c)        ; Verifica se o caractere é um espaço em branco
-        (add-token))
-       ((char=? c #\")              ; Verifica se o caractere é uma aspa dupla
-        (if inside-string?
-            (begin (set! inside-string? #f) (add-token))
-            (set! inside-string? #t)))
-       ((char=? c #\;)              ; Ignora o restante da linha se encontrar um ponto e vírgula (comentário)
-        (add-token)                 ; Adiciona o token antes de ignorar o restante da linha
-        (set! current-token '())    ; Reseta o token atual
-        (set! inside-string? #f)    ; não esta dentro de uma string
-        (read-line))                ; Ignora o restante da linha
-       ((eof-object? c)             ; Verifica se  final do arquivo
-        (add-token))                ; Adiciona o último token se houver algum
-       (else
-        (set! current-token (append current-token (list c))))))
-    (for-each process-char code)
-    tokens))
-;; Exemplo de uso:
-(define code-example
-  "( function main < >
-     vars a b
-     b = 2 !
-     begin
-       a = 2 !
-       if a gt b then b = 0 fi
-       return 0 !
-     end
-   )")
-
-(define example-code
-  " function main < > vars a b b = 2 ! begin a = 2 ! if a gt b then b = 0 fi return 0 ! end")
-
-(define example-tokens 
-  (lexer (string->list code-example)))
-
-(display (parse-program example-tokens))
+(define (exibir-variaveis-escopo-atual)
+  (let ((variaveis-no-escopo (hash->list (car escopos))))
+    (display "Variáveis no escopo atual:")
+    (newline)
+    (for-each (lambda (variavel); Para cada variável no escopo atual
+                (display (format "~a = ~a" (car variavel) (cdr variavel)))
+                (newline))
+              variaveis-no-escopo))); Exibe variáveis no escopo atual
+(exibir-variaveis-escopo-atual)
